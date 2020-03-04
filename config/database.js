@@ -45,10 +45,10 @@ module.exports = {
     connectionString: Env.get('DB_CONNECTION_STRING', ''),
     connection: {
       host: Env.get('DB_HOST', 'localhost'),
-      port: Env.get('DB_PORT', 27017),
-      username: Env.get('DB_USER', 'admin'),
+      port: Env.get('DB_PORT', 45824),
+      username: Env.get('DB_USER', 'kkvjr'),
       password: Env.get('DB_PASSWORD', ''),
-      database: Env.get('DB_DATABASE', 'pays'),
+      database: Env.get('DB_DATABASE', 'kkvasconcelos'),
       options: {
         // replicaSet: Env.get('DB_REPLICA_SET', '')
         // ssl: Env.get('DB_SSL, '')
@@ -56,8 +56,8 @@ module.exports = {
         // socketTimeoutMS: Env.get('DB_SOCKET_TIMEOUT_MS', 180000),
         // w: Env.get('DB_W, 0),
         // readPreference: Env.get('DB_READ_PREFERENCE', 'secondary'),
-        // authSource: Env.get('DB_AUTH_SOURCE', ''),
-        // authMechanism: Env.get('DB_AUTH_MECHANISM', ''),
+         //authSource: Env.get('DB_AUTH_SOURCE', 'admin'),
+        authMechanism: Env.get('DB_AUTH_MECHANISM', 'SCRAM-SHA-1'),
         // other options
       }
     }

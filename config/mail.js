@@ -30,15 +30,15 @@ module.exports = {
 
     host: 'smtp.umbler.com',
 
-    secure: true,
-    tls:{
-      rejectUnauthorized:false,
-    },
+    // secure: true,
+    // tls:{
+    //   rejectUnauthorized:false,
+    // },
     auth: {
 
-      user: 'suporte@kkvjr.com.br',
+      user: 'suporte@kkvasconcelosme.com.br',
 
-      pass: 'c03lh0n3gr0'
+      pass: 'C03lh0Br4nc0'
     },
     maxConnections: 5,
     maxMessages: 100,

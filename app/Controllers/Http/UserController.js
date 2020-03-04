@@ -12,100 +12,136 @@ const { isArray } = require('util')
 
 class UserController {
     async index ({request, auth, response}) {
-        let {page, limit} = request.get();
+        let {page, limit,cliente} = request.get();
 
-        const users = await User.query().orderBy('created_at', 'desc').paginate(+page || 1, +limit || 100);
+        const users = await User.query().where({cliente:cliente}).orderBy('created_at', 'desc').paginate(+page || 1, +limit || 100);
 
         return response.status(200).json(users);
     }
 
     async store ({ request, response }) {
+        try {
+            
         
-        const data = request.only(["nome","email", "password", "password_confirm"]);
+        const data = request.only(["nome","email",'cliente']);
         
         const usr = await User.findBy({email: data.email });
 
         if (usr) return response.status(400).json({ msg: 'Este e-mail já está registrado em outro usuário.' });
 
-        const val = await Validation.validate_pwd(data.password, data.password_confirm);
-        //not ok
-        if (val.msg != "Ok") return response.status(401).json(val);
+        const pwd = await GeneratePwd.random_pwd();
+
+        const hashedPwd = await Hash.make(pwd.pwd);
 
         const user_object = {
             nome:data.nome,
             email: data.email.toLowerCase(),
-            password: data.password,
-            ativo: true
+            password: hashedPwd,
+            ativo: true,
+            ask_reset:true,
+            tipo:'cliente',
+            excluido:false,
+            cliente:data.cliente
         }
 
         const user = await User.create(user_object);
+
+
+        const vars = {
+            to: data.email.toLowerCase(),
+            from: 'suporte@kkvasconcelosme.com.br',
+            subject: 'Bem vindo ao Dashboard da K. K. Vasconcelos M.E.'
+        }
+
+        const obj = {
+            nome: user.nome,
+            nova_senha: pwd.pwd,
+            link:'https://sistemas.kkvasconcelosme.com.br/dashboard-cliente'
+        }
+    
+        await Mail.send('emails.welcome', obj, (message) => {
+
+        message
+            .to(vars.to)
+            .from(vars.from)
+            .subject(vars.subject)
+        })
+
     
         return user;
+        } catch (error) {                
+            console.log(error)
+            return response.status(400).json({error:error});
+        }
     }
-
-
-
 
     async changePassword({request,auth,response, params}){
-        
-
-
-        const data=request.only(["oldpassword","password","confirmation"]);
-        
-        const uid=params.id;
-        
-        let user = await User.findBy('_id',uid);
-
-        const hashedConfirmation=await Hash.make(data.confirmation);
-        
-        
-        const verifyOldPassword = data.oldpassword? await Hash.verify(
-            data.oldpassword,
-            user.password
-        ) : true;
-    
-        
-        if (!verifyOldPassword) {
-            return response.json({
-                status: 'error',
-                message: 'Não foi possível verificar a senha atual. Tente novamente.'
-            });
-        }      
-        
-        const verifyPassword = await Hash.verify(             
-             data.password,
-             hashedConfirmation
-        );
-
-        if (!verifyPassword) {
-            return response.json({
-                status: 'error',
-                message: "A nova senha e sua confirmação não combinam! Tente novamente."
-            });
-        }
-        
-        user.password = data.password;
-        user.ask_reset = false;
-
-        await user.save();
-
-        return response.json({
-            status: 'success',
-            message: 'Senha atualizada!'
-        });
-
-    }
-
-    async changeUser({}) {
-        
-    }
-
-
-    async deleteUser({request,auth,response,params}) {
         try {
-            const id= params.id;
+                        
+            const data=request.only(["oldpassword","password","confirmation"]);
+            
+            const uid=params.id;
+            
+            let user = await User.findBy('_id',uid);
 
-            console.log(id);
+            const hashedConfirmation=await Hash.make(data.confirmation);
+            console.log(data.oldpassword);
+            
+            const verifyOldPassword = data.oldpassword? await Hash.verify(
+                data.oldpassword,
+                user.password
+            ) : true;
+        
+            
+            if (!verifyOldPassword) {
+                return response.json({
+                    status: 'error',
+                    message: 'Não foi possível verificar a senha atual. Tente novamente.'
+                });
+            }      
+            
+
+
+            const verifyPassword = await Hash.verify(             
+                data.password,
+                hashedConfirmation
+            );
+
+                console.log('nova senha:',data.password)
+
+                console.log(verifyPassword);
+
+            if (!verifyPassword) {
+                return response.json({
+                    status: 'error',
+                    message: "A nova senha e sua confirmação não combinam! Tente novamente."
+                });
+            }
+            
+            const hashedPwd = await Hash.make(data.password);
+
+            user.password = hashedPwd;
+
+            user.ask_reset = false;
+            
+            await user.save();
+
+            return response.json({
+                status: 'success',
+                message: 'Senha atualizada!'
+            });
+            
+
+        } catch (error) {
+            console.log(error)       
+        }
+
+    }
+
+
+    async delete({request,auth,response,params}) {
+        try {
+            const id= params.id
 
             const usuario = await User.findBy('_id',id);
             
@@ -128,8 +164,12 @@ class UserController {
             });
             if (!user) return response.status(404).json({error: 'Users not found'});
 
-            user.password = pwd.pwd
+            const hashedPwd = await Hash.make(pwd.pwd);
+
+            user.password = hashedPwd;
+
             user.ask_reset = true;
+            
             await user.save();
 
             const data = request.only(['email'])
@@ -138,13 +178,14 @@ class UserController {
             
             const vars = {
                 to: email,
-                from: 'financeiro@monedd.com',
+                from: 'suporte@kkvasconcelosme.com.br',
                 subject: 'Recuperação de Senha'
             }
 
             const obj = {
                 nome: user.nome,
-                nova_senha: pwd.pwd
+                nova_senha: pwd.pwd,
+                link:'https://sistemas.kkvasconcelosme.com.br/dashboard-cliente'
             }
         
             await Mail.send('emails.reset_pwd', obj, (message) => {
@@ -178,8 +219,10 @@ class UserController {
           if (!user) return response.status(404).json({ error: 'Users not found' })
     
           const pwd = GeneratePwd.random_pwd_numeric()
-    
-          user.password = pwd
+          const hashedPwd = await Hash.make(pwd.pwd);
+
+          user.password = hashedPwd;
+
           user.ask_reset = true
           await user.save()
     
@@ -187,14 +230,14 @@ class UserController {
     
           const vars = {
             to: reset.email,
-            from: `${Env.get('EMAIL_CONTATO_SMTP')}`,
+            from:'suporte@kkvasconcelosme.com.br',
             subject: 'Nova Senha'
           }
     
           const obj = {
             nome: user.first_name,
             nova_senha: pwd,
-            link: `${Env.get('FIVEPAY_URL')}`
+            link: 'https://sistemas.kkvasconcelosme.com.br/dashboard-cliente'
           }
     
           const em = await Mail.send('emails.reset_pwd', obj, message => {
@@ -209,6 +252,7 @@ class UserController {
           await reset.save()
     
           return view.render('emails.reset_pwd_success', {nome: user.first_name})
+
         } catch (error) {
           return response.status(500).json({error: error.message})
         }
@@ -227,13 +271,13 @@ class UserController {
 
             const vars = {
                 to: email,
-                from: 'financeiro@monedd.com',
+                from: 'suporte@kkvasconcelosme.com.br',
                 subject: 'Solicitação de Recuperação de Senha'
             }
 
             const obj = {
                 nome: user.first_name,
-                link: `${Env.get('FIVEPAY_RESETPWD_URL')}/${hash}`
+                link: 'http://localhost:8098/reset-password/'+hash
             }
 
             const em = await Mail.send('emails.ask_reset_pwd', obj, message => {
@@ -288,6 +332,22 @@ class UserController {
 
         } catch (error) {
             return response.status(500).json({ error: error.message });
+        }
+    }
+
+
+
+    async update ({request,response,params}){
+        try {
+            const id = params.id;
+
+            const usuario = request.all();
+
+            await User.query().where({_id:id}).update(usuario);
+
+            return response.status(200).json({data:usuario});
+        } catch (error) {
+            return response.status(500).json({error:error.message})
         }
     }
 
